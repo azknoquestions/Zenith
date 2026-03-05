@@ -1,48 +1,52 @@
-# Push Zenith to GitHub
+# Push Zenith to GitHub (azknoquestions)
 
-Your folder is now a Git repo with an initial commit. To put it on GitHub and collaborate:
+Your folder is a Git repo with `origin` → **https://github.com/azknoquestions/Zenith**. To get it live and keep it in sync with Cursor and collaborators:
 
-## 1. Create the repository on GitHub
+## 1. Create the repository on GitHub (one-time)
 
 - Go to [github.com/new](https://github.com/new)
-- **Repository name:** `Zenith` (or any name you like)
-- Choose **Public** (or Private if you prefer)
-- **Do not** check "Add a README" or "Add .gitignore" — the repo already has them
+- **Repository name:** `Zenith`
+- **Public** or **Private** — your choice
+- **Do not** check "Add a README" or "Add .gitignore"
 - Click **Create repository**
 
-## 2. Connect and push from your machine
+## 2. Sign in and push (one-time)
 
-In Terminal, from the Zenith folder, run (replace `YOUR_USERNAME` with your GitHub username):
+Git needs to authenticate with GitHub. Use one of these:
+
+### Option A: GitHub CLI (recommended)
+
+```bash
+brew install gh
+gh auth login
+```
+
+Then push:
 
 ```bash
 cd "/Users/zak/Library/Mobile Documents/com~apple~CloudDocs/Zenith"
-
-git remote add origin https://github.com/YOUR_USERNAME/Zenith.git
-git branch -M main
 git push -u origin main
 ```
 
-If you use SSH instead of HTTPS:
+### Option B: HTTPS with token
+
+1. GitHub → Settings → Developer settings → [Personal access tokens](https://github.com/settings/tokens) → Generate new token (classic), enable `repo`.
+2. When you run `git push`, use your **username** and the **token** as the password.
+
+### Option C: SSH
 
 ```bash
-git remote add origin git@github.com:YOUR_USERNAME/Zenith.git
-git branch -M main
+# If you don't have an SSH key: ssh-keygen -t ed25519 -C "your@email.com"
+# Add the key to GitHub: https://github.com/settings/keys
+cd "/Users/zak/Library/Mobile Documents/com~apple~CloudDocs/Zenith"
+git remote set-url origin git@github.com:azknoquestions/Zenith.git
 git push -u origin main
 ```
 
-## 3. Optional: set your Git identity
+## 3. Keep it live for Cursor and collaborators
 
-For clearer commit history with your name and email:
+- **You:** After making changes, run `git add . && git commit -m "your message" && git push` so GitHub is always up to date.
+- **Collaborators:** They open the folder in Cursor, run `git pull` when they start, and push their changes the same way.
+- **Cursor:** This project has a rule so the AI is aware of the GitHub remote and can remind you to push/pull.
 
-```bash
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-```
-
-## Collaborating
-
-- **Invite collaborators:** Repo → Settings → Collaborators → Add people
-- **Get updates:** `git pull`
-- **Share your changes:** `git add .` → `git commit -m "Your message"` → `git push`
-
-You can delete this file after you’ve pushed to GitHub.
+Repo URL (after you create it): **https://github.com/azknoquestions/Zenith**

@@ -1,0 +1,16 @@
+---
+description: Keep Zenith in sync with GitHub for Cursor and collaborators
+alwaysApply: true
+---
+
+# GitHub sync (live at all times)
+
+- **Remote:** `origin` → https://github.com/azknoquestions/Zenith
+- **Branch:** `main`
+
+When making or suggesting changes:
+- Prefer committing and pushing so GitHub stays up to date and collaborators see changes.
+- Remind the user to run `git pull` when opening the project if others might have pushed.
+- After significant edits, suggest: `git add . && git commit -m "description" && git push`
+
+This repo is meant to be accessible by Cursor and stay live for collaboration.
