@@ -1,10 +1,10 @@
 # Zenith
 
-Collaborative project — add your description here.
+The most powerful pro-firm trading app.
 
 ## Setup
 
-1. Clone the repo: `git clone <repo-url>`
+1. Clone the repo: `git clone git@github.com:azknoquestions/Zenith.git`
 2. Open the folder and start working.
 
 ## Collaborating
