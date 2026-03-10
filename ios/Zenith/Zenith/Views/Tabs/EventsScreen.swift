@@ -1,18 +1,40 @@
 import SwiftUI
 
+enum EventsRange: String, CaseIterable {
+    case today = "Today"
+    case week = "This week"
+}
+
 struct EventsScreen: View {
     @State private var events: [EconomicEvent] = []
     @State private var isLoading: Bool = false
+    @State private var range: EventsRange = .today
 
     var body: some View {
         NavigationStack {
             ZStack {
                 ZenithColors.background.ignoresSafeArea()
 
-                content
+                VStack(spacing: 0) {
+                    Picker("Range", selection: $range) {
+                        ForEach(EventsRange.allCases, id: \.self) { r in
+                            Text(r.rawValue).tag(r)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
+                    .onChange(of: range) { _, _ in Task { await loadEvents() } }
+
+                    content
+                }
             }
             .navigationBarHidden(true)
             .task {
+                await loadEvents()
+            }
+            .refreshable {
                 await loadEvents()
             }
         }
@@ -23,6 +45,11 @@ struct EventsScreen: View {
             if isLoading && events.isEmpty {
                 ProgressView()
                     .tint(ZenithColors.accent)
+            } else if events.isEmpty && !isLoading {
+                Text("No economic events in this range")
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundColor(ZenithColors.textSecondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 10) {
@@ -43,9 +70,17 @@ struct EventsScreen: View {
     private func loadEvents() async {
         isLoading = true
         defer { isLoading = false }
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: Date())
+        let end: Date
+        switch range {
+        case .today:
+            end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
+        case .week:
+            end = calendar.date(byAdding: .day, value: 7, to: start) ?? start
+        }
         do {
-            let fetched = try await NewsService.shared.fetchEvents()
-            events = fetched
+            events = try await NewsService.shared.fetchEvents(from: start, to: end)
         } catch {
             events = DemoEvents.sample
         }
@@ -55,10 +90,17 @@ struct EventsScreen: View {
 struct EventRowView: View {
     let event: EconomicEvent
 
+    private var dateTimeText: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: event.time)
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(event.time, style: .time)
+                Text(dateTimeText)
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
                     .foregroundColor(ZenithColors.textPrimary)
 

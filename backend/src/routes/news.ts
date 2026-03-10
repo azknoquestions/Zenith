@@ -6,40 +6,89 @@ export const newsRouter = express.Router();
 
 const NEWS_CATEGORIES = ["general", "forex", "crypto", "merger"] as const;
 
+/** Normalized news item shape for the API response */
+interface NewsItemNormalized {
+  id: string;
+  headline: string;
+  source: string;
+  publishedAt: string;
+  summary: string;
+  symbols: string[];
+}
+
+async function fetchFinnhubNews(categories: string[]): Promise<NewsItemNormalized[]> {
+  if (!env.FINNHUB_API_KEY) return [];
+  const out: NewsItemNormalized[] = [];
+  for (const category of categories.slice(0, 6)) {
+    try {
+      const url = `https://finnhub.io/api/v1/news?category=${encodeURIComponent(category)}&token=${env.FINNHUB_API_KEY}`;
+      const { data } = await axios.get(url, { timeout: 5000 });
+      const items = Array.isArray(data) ? data : [];
+      for (const item of items) {
+        const id = item.id?.toString() ?? item.datetime?.toString() ?? "";
+        if (id) {
+          out.push({
+            id,
+            headline: item.headline,
+            source: item.source ?? "",
+            publishedAt: new Date((item.datetime || 0) * 1000).toISOString(),
+            summary: item.summary ?? "",
+            symbols: item.related ? (item.related as string).split(",").filter(Boolean) : []
+          });
+        }
+      }
+    } catch (_) {
+      // skip failed category
+    }
+  }
+  return out;
+}
+
+async function fetchNewsdataNews(): Promise<NewsItemNormalized[]> {
+  if (!env.NEWSDATA_API_KEY) return [];
+  try {
+    const url = `https://newsdata.io/api/1/latest?apikey=${encodeURIComponent(env.NEWSDATA_API_KEY)}&language=en`;
+    const { data } = await axios.get(url, { timeout: 8000 });
+    const raw = data?.results ?? data?.data ?? (Array.isArray(data) ? data : []);
+    if (!Array.isArray(raw)) return [];
+    const out: NewsItemNormalized[] = [];
+    for (const item of raw) {
+      const id = item.article_id ?? item.link ?? item.pubDate ?? "";
+      if (!id) continue;
+      const pubDate = item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString();
+      out.push({
+        id: String(id),
+        headline: item.title ?? "",
+        source: item.source_name ?? item.source_id ?? "",
+        publishedAt: pubDate,
+        summary: item.description ?? "",
+        symbols: Array.isArray(item.keywords) ? item.keywords.slice(0, 10) : []
+      });
+    }
+    return out;
+  } catch (_) {
+    return [];
+  }
+}
+
 newsRouter.get("/headlines", async (req, res) => {
   try {
-    if (!env.FINNHUB_API_KEY) {
-      return res.json({ news: [] });
-    }
-
     const categoriesParam = (req.query.categories as string) || NEWS_CATEGORIES.join(",");
     const categories = categoriesParam.split(",").map((c) => c.trim()).filter(Boolean);
     const toFetch = categories.length > 0 ? categories : [...NEWS_CATEGORIES];
 
-    const seen = new Set<string>();
-    const all: any[] = [];
+    const [finnhubItems, newsdataItems] = await Promise.all([
+      fetchFinnhubNews(toFetch),
+      fetchNewsdataNews()
+    ]);
 
-    for (const category of toFetch.slice(0, 6)) {
-      try {
-        const url = `https://finnhub.io/api/v1/news?category=${encodeURIComponent(category)}&token=${env.FINNHUB_API_KEY}`;
-        const { data } = await axios.get(url, { timeout: 5000 });
-        const items = Array.isArray(data) ? data : [];
-        for (const item of items) {
-          const id = item.id?.toString() ?? item.datetime?.toString() ?? "";
-          if (id && !seen.has(id)) {
-            seen.add(id);
-            all.push({
-              id,
-              headline: item.headline,
-              source: item.source,
-              publishedAt: new Date((item.datetime || 0) * 1000).toISOString(),
-              summary: item.summary ?? "",
-              symbols: item.related ? (item.related as string).split(",").filter(Boolean) : []
-            });
-          }
-        }
-      } catch (_) {
-        // skip failed category
+    const seen = new Set<string>();
+    const all: NewsItemNormalized[] = [];
+    for (const item of [...finnhubItems, ...newsdataItems]) {
+      const dedupeKey = item.id || item.headline?.slice(0, 80) || "";
+      if (dedupeKey && !seen.has(dedupeKey)) {
+        seen.add(dedupeKey);
+        all.push(item);
       }
     }
 

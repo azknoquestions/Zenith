@@ -3,6 +3,7 @@ import axios from "axios";
 import { env } from "../config/env";
 import {
   getProjectXToken,
+  getProjectXTokenWithReason,
   getContractId,
   getProjectXContracts,
   getProjectXBars,
@@ -29,37 +30,89 @@ function getAuth(req: express.Request): { apiKey: string | undefined; userName: 
   };
 }
 
+/** GET /topstep/connection - Validate API key and return connection status (for iOS "Test connection"). */
+topstepRouter.get("/connection", async (req, res) => {
+  try {
+    const { apiKey, userName } = getAuth(req);
+    if (!apiKey || !apiKey.trim()) {
+      return res.status(400).json({
+        connected: false,
+        error: "missing_key",
+        message: "API key is required. Enter your TopstepX API key in the app."
+      });
+    }
+
+    const result = await getProjectXTokenWithReason(apiKey.trim(), userName?.trim() || undefined);
+    if (!result.ok) {
+      const status = result.reason === "invalid_key" ? 401 : 502;
+      return res.status(status).json({
+        connected: false,
+        error: result.reason,
+        message: result.message
+      });
+    }
+
+    const base = env.PROJECTX_BASE_URL;
+    let accountCount = 0;
+    try {
+      const { data } = await axios.post<{ accounts?: unknown[]; success?: boolean }>(
+        `${base}/api/Account/search`,
+        { onlyActiveAccounts: true },
+        { headers: { Authorization: `Bearer ${result.token}`, "Content-Type": "application/json", accept: "application/json" }, timeout: 10000 }
+      );
+      accountCount = (data?.success && Array.isArray(data.accounts)) ? data.accounts.length : 0;
+    } catch (_) {
+      // still connected (auth worked)
+    }
+
+    return res.json({
+      connected: true,
+      accountCount,
+      message: accountCount > 0 ? `Connected. ${accountCount} account(s) found.` : "Connected. No accounts in this key."
+    });
+  } catch (error) {
+    return res.status(500).json({
+      connected: false,
+      error: "server_error",
+      message: "Could not verify connection."
+    });
+  }
+});
+
 topstepRouter.get("/accounts", async (req, res) => {
   try {
     const { apiKey, userName } = getAuth(req);
 
     if (apiKey) {
-      const token = await getProjectXToken(apiKey, userName);
-      if (token) {
-        try {
-          const base = env.PROJECTX_BASE_URL;
-          const { data } = await axios.get(`${base}/api/Account/list`, {
-            headers: { Authorization: `Bearer ${token}`, accept: "application/json" },
-            timeout: 10000
-          });
-          if (Array.isArray(data) && data.length > 0) {
-            const accounts = data.map((a: { accountId?: number; name?: string; type?: string }) => ({
-              id: String(a.accountId ?? a),
-              name: a.name ?? `Account ${a.accountId ?? a}`,
-              type: a.type ?? "Evaluation",
-              currency: "USD",
-              balance: 0,
-              equity: 0,
-              drawdownLimit: null
-            }));
-            return res.json({ accounts });
-          }
-          return res.json({ accounts: [] });
-        } catch (_) {
-          return res.status(502).json({ error: "Failed to fetch accounts from Topstep" });
-        }
+      const result = await getProjectXTokenWithReason(apiKey, userName);
+      if (!result.ok) {
+        const status = result.reason === "invalid_key" ? 401 : 502;
+        return res.status(status).json({ error: result.message });
       }
-      return res.status(401).json({ error: "Invalid API key" });
+      const token = result.token;
+      try {
+        const base = env.PROJECTX_BASE_URL;
+        const { data } = await axios.post<{ accounts?: Array<{ id?: number; name?: string; balance?: number }>; success?: boolean }>(
+          `${base}/api/Account/search`,
+          { onlyActiveAccounts: true },
+          { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", accept: "application/json" }, timeout: 10000 }
+        );
+        if (data?.success && Array.isArray(data.accounts) && data.accounts.length > 0) {
+          const accounts = data.accounts.map((a) => ({
+            id: String(a.id ?? ""),
+            name: a.name ?? `Account ${a.id ?? ""}`,
+            type: "Evaluation",
+            currency: "USD",
+            balance: a.balance ?? 0,
+            equity: a.balance ?? 0,
+            drawdownLimit: null
+          }));
+          return res.json({ accounts });
+        }
+        return res.json({ accounts: [] });
+      } catch (_) {
+        return res.status(502).json({ error: "Failed to fetch accounts from Topstep. Try again in a moment." });
+      }
     }
 
     return res.json({ accounts: [DEMO_ACCOUNT] });

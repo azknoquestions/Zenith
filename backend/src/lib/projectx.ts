@@ -9,24 +9,55 @@ import { env } from "../config/env";
 const cache = new Map<string, { token: string; expiresAt: number }>();
 const TTL_MS = 50 * 60 * 1000; // 50 min
 
+export type ProjectXAuthResult =
+  | { ok: true; token: string }
+  | { ok: false; reason: "invalid_key" | "timeout" | "server_error"; message: string };
+
 export async function getProjectXToken(apiKey: string, userName?: string): Promise<string | null> {
+  const result = await getProjectXTokenWithReason(apiKey, userName);
+  return result.ok ? result.token : null;
+}
+
+export async function getProjectXTokenWithReason(
+  apiKey: string,
+  userName?: string
+): Promise<ProjectXAuthResult> {
   const key = `${userName ?? ""}:${apiKey}`;
   const cached = cache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.token;
+  if (cached && cached.expiresAt > Date.now()) {
+    return { ok: true, token: cached.token };
+  }
 
   const base = env.PROJECTX_BASE_URL;
+  const effectiveUser = (userName ?? "").trim() || "trader";
   try {
-    const { data } = await axios.post<{ token?: string; success?: boolean; errorCode?: number }>(
+    const res = await axios.post<{ token?: string; success?: boolean; errorCode?: number; errorMessage?: string }>(
       `${base}/api/Auth/loginKey`,
-      { userName: userName ?? "trader", apiKey },
-      { headers: { "Content-Type": "application/json", accept: "text/plain" }, timeout: 10000 }
+      { userName: effectiveUser, apiKey },
+      { headers: { "Content-Type": "application/json", accept: "application/json" }, timeout: 12000, validateStatus: () => true }
     );
-    if (data.success && data.token) {
-      cache.set(key, { token: data.token, expiresAt: Date.now() + TTL_MS });
-      return data.token;
+    const data = res.data;
+    if (res.status === 401 || (data && data.success === false)) {
+      return { ok: false, reason: "invalid_key", message: data?.errorMessage ?? "Invalid API key or username." };
     }
-  } catch (_) {}
-  return null;
+    if (data?.success && data?.token) {
+      cache.set(key, { token: data.token, expiresAt: Date.now() + TTL_MS });
+      return { ok: true, token: data.token };
+    }
+    return { ok: false, reason: "invalid_key", message: data?.errorMessage ?? "Invalid API key or username." };
+  } catch (err: any) {
+    if (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT") {
+      return { ok: false, reason: "timeout", message: "Topstep took too long to respond. Check your connection." };
+    }
+    if (err.response?.status >= 500) {
+      return { ok: false, reason: "server_error", message: "Topstep service is temporarily unavailable." };
+    }
+    if (err.response?.status === 401) {
+      return { ok: false, reason: "invalid_key", message: "Invalid API key or username." };
+    }
+    const msg = err.message ?? String(err);
+    return { ok: false, reason: "server_error", message: msg || "Could not reach Topstep." };
+  }
 }
 
 /** Map symbol to ProjectX contractId (fallback when Contract/available not used). */

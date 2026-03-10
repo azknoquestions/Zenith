@@ -4,18 +4,34 @@ struct NewsScreen: View {
     @State private var items: [NewsItem] = []
     @State private var selectedFilter: NewsFilter = .all
     @State private var isLoading: Bool = false
+    @State private var loadError: String?
 
     var body: some View {
         NavigationStack {
             ZStack {
                 ZenithColors.background.ignoresSafeArea()
 
-                content
+                VStack(spacing: 0) {
+                    if loadError != nil {
+                        HStack {
+                            Text("Couldn't load latest.")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .foregroundColor(ZenithColors.textSecondary)
+                            Button("Retry") { Task { await loadNews() } }
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(ZenithColors.accent)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                        .background(ZenithColors.surface.opacity(0.8))
+                    }
+                    content
+                }
             }
             .navigationBarHidden(true)
-            .task {
-                await loadNews()
-            }
+            .task { await loadNews() }
+            .refreshable { await loadNews() }
         }
     }
 
@@ -26,6 +42,11 @@ struct NewsScreen: View {
             if isLoading && items.isEmpty {
                 ProgressView()
                     .tint(ZenithColors.accent)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if items.isEmpty {
+                Text("No news available")
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundColor(ZenithColors.textSecondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -86,11 +107,13 @@ struct NewsScreen: View {
 
     private func loadNews() async {
         isLoading = true
+        loadError = nil
         defer { isLoading = false }
         do {
             let fetched = try await NewsService.shared.fetchHeadlines()
             items = fetched
         } catch {
+            loadError = error.localizedDescription
             items = DemoNews.sample
         }
     }

@@ -13,7 +13,7 @@ struct ZenithApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .environmentObject(sessionStore)
         }
     }

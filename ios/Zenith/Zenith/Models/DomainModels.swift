@@ -17,6 +17,60 @@ struct Instrument: Identifiable, Codable, Hashable {
     let assetClass: String
 }
 
+struct Contract: Identifiable, Codable, Hashable {
+    let id: String
+    let name: String
+    let description: String
+    let symbolId: String
+    let tickSize: Double
+    let tickValue: Double
+}
+
+struct Position: Identifiable, Codable, Hashable {
+    let id: String
+    let accountId: String
+    let contractId: String
+    let contractName: String
+    let symbol: String
+    let type: Int
+    let size: Int
+    let averagePrice: Double
+    let creationTimestamp: String?
+}
+
+struct Order: Identifiable, Codable, Hashable {
+    let id: String
+    let accountId: String
+    let contractId: String
+    let contractName: String
+    let symbol: String
+    let status: Int
+    let type: Int
+    let side: Int
+    let size: Int
+    let limitPrice: Double?
+    let stopPrice: Double?
+    let fillVolume: Int
+    let filledPrice: Double?
+    let creationTimestamp: String?
+    let updateTimestamp: String?
+}
+
+struct Trade: Identifiable, Codable, Hashable {
+    let id: String
+    let accountId: String
+    let contractId: String
+    let contractName: String
+    let symbol: String
+    let orderId: String?
+    let side: Int
+    let size: Int
+    let price: Double
+    let profitLoss: Double?
+    let fees: Double?
+    let creationTimestamp: String?
+}
+
 struct Quote: Identifiable, Codable, Hashable {
     let id: String
     let instrument: Instrument

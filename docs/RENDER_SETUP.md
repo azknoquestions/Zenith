@@ -22,13 +22,15 @@ Use this so the app works from anywhere (no localhost). After deployment, the iO
 
 5. Click **Advanced** and add **Environment Variables**. Add each key from your local `.env` (do **not** commit `.env`):
 
-   | Key | Value (paste from your .env) |
-   |-----|------------------------------|
-   | `FINNHUB_API_KEY` | your Finnhub key |
-   | `NVIDIA_API_KEY` | your NVIDIA API key |
-   | `TOPSTEP_BASE_URL` | `https://api.topstep.com` |
+   | Key | Required for | Value |
+   |-----|----------------|-------|
+   | `PROJECTX_BASE_URL` | Topstep / accounts, quotes, orders | `https://api.topstepx.com` (no trailing slash; Topstep gateway) |
+   | `FINNHUB_API_KEY` | News headlines + economic events | your Finnhub key |
+   | `NEWSDATA_API_KEY` | Extra news (optional) | your NewsData.io key |
+   | `NVIDIA_API_KEY` | AI chat | your NVIDIA API key |
+   | `TOPSTEP_BASE_URL` | (optional) | `https://api.topstep.com` |
 
-   Leave `PORT` unset; Render sets it automatically.
+   The app sends the **user’s Topstep API key** from the device; the backend uses `PROJECTX_BASE_URL` to talk to ProjectX. For “accounts fetch failed” or news not loading, confirm these env vars are set on Render and that `ApiConfig.baseURL` in the app matches your Render URL. Leave `PORT` unset; Render sets it automatically.
 
 6. Click **Create Web Service**. Render will clone the repo, run the build in `backend`, and start the server.
 
@@ -46,8 +48,8 @@ Use this so the app works from anywhere (no localhost). After deployment, the iO
 
 ## 3. Match the iOS app to your URL
 
-- The app is already set to use **https://zenith-backend.onrender.com** in `ios/Zenith/Zenith/Services/ApiConfig.swift`.
-- If you used a **different service name** on Render (e.g. `zenith-api`), your URL will be `https://zenith-api.onrender.com`. In Xcode, open `ApiConfig.swift` and change the URL to that value.
+- The app uses **direct backend** by default (`useSupabase = false`). It calls `baseURL` in `ios/Zenith/Zenith/Services/ApiConfig.swift` (e.g. **https://zenith-backend.onrender.com**).
+- If your Render service has a different name, set `baseURL` to that URL (e.g. `https://zenith-api.onrender.com`). That’s the server where your API keys must be set (Render Environment tab).
 
 ## 4. Test the app
 

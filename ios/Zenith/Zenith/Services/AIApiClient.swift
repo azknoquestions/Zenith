@@ -1,13 +1,12 @@
 import Foundation
 
 final class AIApiClient {
-    private let baseURL = URL(string: "http://localhost:4000")!
-
     func send(messages: [AIMessage]) async throws -> String {
-        let url = baseURL.appendingPathComponent("ai/chat")
+        guard let url = ApiConfig.url(path: "ai/chat") else { throw NSError(domain: "AIApiClient", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]) }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        ApiConfig.supabaseHeaders().forEach { request.setValue($1, forHTTPHeaderField: $0) }
 
         struct WireMessage: Codable {
             let role: String
